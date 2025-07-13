@@ -1,0 +1,165 @@
+use json;
+use math;
+use geodata;
+use datetime;
+use io;
+
+
+function input() {
+    data = json.parse(inFileName);
+    local dayslist = {"customers20250112", "customers20250113","customers20250114", "customers20250115","customers20250116", "customers20250117","customers20250118","customers20250119","customers20250120", "customers20250121",
+    "customers20250122", "customers20250123","customers20250124", "customers20250125","customers20250126", "customers20250127","customers20250128", "customers20250129","customers20250130", "customers20250131",
+    "customers20250201", "customers20250202", "customers20250203", "customers20250204", "customers20250205", "customers20250206", "customers20250207", "customers20250208", "customers20250209", "customers20250210",
+    "customers20250211","customers20250212","customers20250213","customers20250214","customers20250215","customers20250216","customers20250217","customers20250218","customers20250219"};
+    nbTrucks = data.trucks.count();
+    for[day in 0...dayslist.count()] { //dayslist.count()                           //for each day count Customers, compute Distances
+        nbCustomers[day] = data.days[day][dayslist[day]].count();
+        if (nbCustomers[day] > 0) {                                                 //there are 2 days with no deliveries, computing Distances is not possible then!!!
+            computeDistanceBetweenCustomers(dayslist, day);
+            computeDistanceCustomerDepot(dayslist, day);
+        }
+    }
+}
+function model() {
+    local dayslist = {"customers20250112", "customers20250113","customers20250114", "customers20250115","customers20250116", "customers20250117","customers20250118","customers20250119","customers20250120", "customers20250121",
+    "customers20250122", "customers20250123","customers20250124", "customers20250125","customers20250126", "customers20250127","customers20250128", "customers20250129","customers20250130", "customers20250131",
+    "customers20250201", "customers20250202", "customers20250203", "customers20250204", "customers20250205", "customers20250206", "customers20250207", "customers20250208", "customers20250209", "customers20250210",
+    "customers20250211","customers20250212","customers20250213","customers20250214","customers20250215","customers20250216","customers20250217","customers20250218","customers20250219"};
+    for[day in 0...dayslist.count()] { //dayslist.count()                          //for each day make a model
+        if (nbCustomers[day] > 0) {
+        customerDemand[day] <- array[customer in data.days[day][dayslist[day]]](customer.demand);
+        customerSequences[day][k in 0...nbTrucks] <- list(nbCustomers[day]);
+        constraint partition[k in 0...nbTrucks](customerSequences[day][k]);
+        for[k in 0...nbTrucks] {
+            local sequence[day] <- customerSequences[day][k];
+            local l[day] <- count(sequence[day]);
+            routeUsed[day][k] <- l[day] > 0;
+            routeQuantity[day][k] <- sum(0...l[day], i => customerDemand[day][sequence[day][i]]);
+            constraint routeQuantity[day][k] <= data.trucks[k].capacity;
+            routeDistance[day][k] <- sum(1...l[day], i => distanceBetweenCustomers[day][sequence[day][i-1]][sequence[day][i]]) + (routeUsed[day][k] ? distanceFromDepot[day][sequence[day][0]] + distanceToDepot[day][sequence[day][l[day]-1]] : 0);
+            constraint routeDistance[day][k] <= data.trucks[k].maxAmplitude;
+            routeEndTime[day][k] <- array(0...l[day], (i, prev) => max(data.customerTimeWindowStart, i == 0 ? duration(distanceFromDepot[day][sequence[day][0]]) : prev + duration(distanceBetweenCustomers[day][sequence[day][i-1]][sequence[day][i]])) + data.customerServiceTime);
+            routeFinalTime[day][k] <- routeUsed[day][k] ? routeEndTime[day][k][l[day]-1] + duration(distanceToDepot[day][sequence[day][l[day]-1]]) : 0;
+            travelTime[day][k] <- sum(1...l[day], i => duration(distanceBetweenCustomers[day][sequence[day][i-1]][sequence[day][i]])) + (routeUsed[day][k] ? duration(distanceFromDepot[day][sequence[day][0]]) + duration(distanceToDepot[day][sequence[day][l[day]-1]]) : 0);
+            
+            constraint travelTime[day][k] <= data.maxtime;
+            lateness[day][k] <- sum(0...l[day], i => max(0, routeEndTime[day][k][i] - data.customerTimeWindowEnd));
+            constraint lateness[day][k] <= 0;
+        }
+        totalrouteQuantity[day] <- sum[k in 0...nbTrucks](routeQuantity[day][k]);
+        totalDistance[day] <- sum[k in 0...nbTrucks](routeDistance[day][k]);
+        totalLateness[day] <- sum[k in 0...nbTrucks](lateness[day][k]);
+        totalUsageCost[day] <- sum[k in 0...nbTrucks](data.trucks[k].price);
+        minimize totalUsageCost[day];      
+        minimize totalDistance[day];
+       // minimize totalrouteQuantity[day];
+        }
+    }
+}
+
+function param() {
+    if(lsTimeLimit == nil) {
+        lsTimeLimit = 20;
+    }
+}
+
+function output() {
+    local dayslist = {"customers20250112", "customers20250113","customers20250114", "customers20250115","customers20250116", "customers20250117","customers20250118","customers20250119","customers20250120", "customers20250121",
+    "customers20250122", "customers20250123","customers20250124", "customers20250125","customers20250126", "customers20250127","customers20250128", "customers20250129","customers20250130", "customers20250131",
+    "customers20250201", "customers20250202", "customers20250203", "customers20250204", "customers20250205", "customers20250206", "customers20250207", "customers20250208", "customers20250209", "customers20250210",
+    "customers20250211","customers20250212","customers20250213","customers20250214","customers20250215","customers20250216","customers20250217","customers20250218","customers20250219"};
+    for[day in 0...dayslist.count()] { //dayslist.count()
+        if (nbCustomers[day] > 0) {
+            outputDistance[day] = (round(100 * totalDistance[day].value) / 100) + " km";
+            outputLateness[day] = printTimespan(totalLateness[day].value);
+            outputPoints[day] = {};
+            outputPointsIndices[day] = {};
+            nbPoints[day] = 0;
+            customers[day] = data.days[day][dayslist[day]];
+            for[c in 0...nbCustomers[day]] {
+                outputPoints[day].add({"name": customers[day][c].name, "index": c, "color": "#3f87d2", "latitude": customers[day][c].latitude, "longitude": customers[day][c].longitude, "isDepot": false});
+                outputPointsIndices[day][customers[day][c].id] = nbPoints[day];
+                nbPoints[day] += 1;
+            }
+            outputPoints[day].add({"name": data.depotName, "index": 0, "color": "#731fd2", "latitude": data.depotLatitude, "longitude": data.depotLongitude, "isDepot": true});
+            outputPointsIndices[day][data.depotId] = nbPoints[day];
+            nbPoints[day] += 1;
+            outputRoutes[day] = {};
+            for[k in 0...nbTrucks] {
+                if(!routeUsed[day][k].value) {
+                    continue;
+                }
+                route[day] = {outputPointsIndices[day][data.depotId]};
+                for[i in 0...customerSequences[day][k].value.count()] {
+                    customer = customerSequences[day][k].value[i];
+                    route[day].add(outputPointsIndices[day][customers[day][customer].id]);
+                }
+                route[day].add(outputPointsIndices[day][data.depotId]);
+                outputRoutes[day].add(route[day]);
+                routeColor[route[day]] = data.trucks[k].color;
+            }
+            outputTasks[day] = {};
+            for[k in 0...nbTrucks] {
+                if(!routeUsed[day][k].value) {
+                    continue;
+                }
+                for[i in 0...customerSequences[day][k].value.count()] {
+                    outputTasks[day].add(toMilliseconds({"name": "Service " + customers[day][customerSequences[day][k].value[i]].name, "startTime": (routeEndTime[day][k].value[i] - data.customerServiceTime), "endTime": routeEndTime[day][k].value[i], "resource": "Truck " + k, "color": "#c7c4c4"}));
+                }
+                for[i in 0..customerSequences[day][k].value.count()] {
+                    local startRoute[day] = i == 0 ? (28800 - duration(distanceFromDepot[day][customerSequences[day][k].value[i]])) : routeEndTime[day][k].value[i-1];   //trucks leave just in time to arrive at 8am at their first customer
+                    local routeDuration[day] = i == 0 ? duration(distanceFromDepot[day][customerSequences[day][k].value[i]]) : (i == customerSequences[day][k].value.count() ? duration(distanceToDepot[day][customerSequences[day][k].value[i-1]]) : duration(distanceBetweenCustomers[day][customerSequences[day][k].value[i-1]][customerSequences[day][k].value[i]]));
+                    local taskName[day] = "Route from " + (i == 0 ? data.depotName : customers[day][customerSequences[day][k].value[i-1]].name) + " to " + (i == customerSequences[day][k].value.count() ? data.depotName : customers[day][customerSequences[day][k].value[i]].name);
+                    outputTasks[day].add(toMilliseconds({"name": taskName[day], "startTime": startRoute[day], "endTime": (startRoute[day] + routeDuration[day]), "resource": "Truck " + k, "color": data.trucks[k].color}));
+                }
+            outputTrucks[day] = outputRoutes[day].count();
+            }
+        }
+        else {
+
+        }
+    }
+}
+
+function computeDistanceBetweenCustomers(dayslist, day) {
+    local origins = {};
+    for[customer in 0...nbCustomers[day]] {
+        location = {latitude: data.days[day][dayslist[day]][customer]["latitude"],longitude: data.days[day][dayslist[day]][customer]["longitude"]};
+        origins.add(location);
+    }
+    distanceBetweenCustomers[day] = geodata.computeMatrix(origins)["distances"];
+    distanceBetweenCustomers[day][n1 in 0...nbCustomers[day]][n2 in 0...nbCustomers[day]] = round(distanceBetweenCustomers[day][n1][n2] / 1000);
+}
+
+function computeDistanceCustomerDepot(dayslist, day) {
+    depotSource[0] = {"latitude": data.depotLatitude, "longitude": data.depotLongitude};
+    distanceFromDepotWithGeodata[day] = geodata.computeMatrix(depotSource, data.days[day][dayslist[day]])["distances"];
+    distanceToDepotWithGeodata[day] = geodata.computeMatrix(data.days[day][dayslist[day]], depotSource)["distances"];
+    distanceFromDepot[day][n in 0...nbCustomers[day]] = round(distanceFromDepotWithGeodata[day][0][n] / 1000);
+    distanceToDepot[day][n in 0...nbCustomers[day]] = round(distanceToDepotWithGeodata[day][n][0] / 1000);
+}
+
+function duration(distance) {
+    return round(distance / data.truckSpeed);
+}
+
+function printTimespan(objective) {
+    timespan = datetime.span(0, 0, round(objective));
+    if(timespan.totalDays >= 1) {
+        return round(10 * timespan.totalDays) / 10 + " day(s)";
+    }
+    if(timespan.totalHours >= 1) {
+        return round(10 * timespan.totalHours) / 10 + " h";
+    }
+    if(timespan.totalMinutes >= 1) {
+        return round(10 * timespan.totalMinutes) / 10 + " min";
+    }
+    if(timespan.totalSeconds >= 1) {
+        return round(10 * timespan.totalSeconds) / 10 + " sec";
+    }
+    return 0;
+}
+
+function toMilliseconds(task) {
+    return {"name": task.name, "startTime": task.startTime * 1000, "endTime": task.endTime * 1000, "resource": task.resource, "color": task.color};
+}
