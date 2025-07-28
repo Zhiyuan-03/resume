@@ -1,0 +1,773 @@
+---
+title: "G0O02a: Statistical Data Analysis: Project 1 - 2024/2025 Spring"
+author: "Ma Zhiyuan"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Notes
+
+> You can use the below template for your answers. Feel free to add/remove more code chunks and discussions in between, this is just a template.
+
+> You only need to send your Rmd file. No need to create a PDF. 
+
+> Before submitting on Toledo, be careful that your code runs without any errors. We use "Run All" (Ctrl+Alt+R on windows) to check your code.
+
+> Your file name should be "LastName_FirstName_Project1.Rmd"
+
+
+```{r}
+# Load libraries here
+library(ggplot2)
+library(MASS)
+library(robustbase)
+library(car)
+library(rrcov)
+library(dplyr)
+library(outliers)
+library(gridExtra)
+library(Hmisc)
+library(rrcov)
+library(corrplot)
+library(factoextra)
+```
+
+# Loading Data
+
+```{r}
+set.seed(1015487) # use your student number instead of 0012345
+football_dataset <- read.csv2("Football.csv")
+myposition <- sample(c("ATK", "DEF", "MID"), 1)
+myindex <- which(football_dataset$position == myposition)
+mydatafull <- football_dataset[myindex, ]
+mysample <- sample(1:nrow(mydatafull), 400)
+mydata <- data.frame(mydatafull[mysample, ])
+```
+
+
+# Questions
+
+## Question 1
+
+```{r}
+# View data structure
+str(mydata)  # Display structure of the dataset
+head(mydata)  # Display first few rows of the dataset
+colnames(mydata)  # Check column names
+hist.data.frame(mydata[, 1:2], freq=FALSE)
+```
+
+
+
+```{r}
+# Histograms
+ggplot(mydata, aes(x = shots)) +
+  geom_histogram(bins = 30, fill = "blue", alpha = 0.5) +
+  theme_minimal() +
+  ggtitle("Histogram of Shots")
+
+ggplot(mydata, aes(x = dribbles_per_90 )) +
+  geom_histogram(bins = 30, fill = "red", alpha = 0.5) +
+  theme_minimal() +
+  ggtitle("Histogram of Dribbles per 90")
+
+ggplot(mydata, aes(x = age)) +
+  geom_histogram(binwidth = 1, fill = "blue", alpha = 0.6, color = "black") +
+  ggtitle("Distribution of Player Age") 
+
+ggplot(mydata, aes(x = minutes_played)) +
+  geom_histogram(binwidth = 100, fill = "red", alpha = 0.6, color = "black") +
+  ggtitle("Distribution of Minutes Played") 
+
+ggplot(mydata, aes(x = matches_played)) +
+  geom_histogram(binwidth = 1, fill = "blue", alpha = 0.5) +
+  theme_minimal() +
+  ggtitle("Histogram of matches played")
+
+ggplot(mydata, aes(x = accurate_forward_passes_percentage )) +
+  geom_histogram(binwidth = 1, fill = "red", alpha = 0.5) +
+  theme_minimal() +
+  ggtitle("Histogram of accurate forward passes percentage")
+
+ggplot(mydata, aes(x =  accurate_lateral_passes_percentage)) +
+  geom_histogram(binwidth = 1, fill = "blue", alpha = 0.6, color = "black") +
+  ggtitle("Distribution of  accurate lateral passes percentage") 
+
+ggplot(mydata, aes(x = accurate_passes_percentage)) +
+  geom_histogram(binwidth = 1, fill = "red", alpha = 0.6, color = "black") +
+  ggtitle("Distribution of accurate passes percentage") 
+
+ggplot(mydata, aes(x = back_passes_per_90)) +
+  geom_histogram(bins = 30, fill = "blue", alpha = 0.5) +
+  theme_minimal() +
+  ggtitle("Histogram of back passes per 90")
+
+ggplot(mydata, aes(x = duels_per_90 )) +
+  geom_histogram(bins = 30, fill = "red", alpha = 0.5) +
+  theme_minimal() +
+  ggtitle("Histogram of back passes per 90")
+
+ggplot(mydata, aes(x =  duels_won_percentage)) +
+  geom_histogram(binwidth = 1, fill = "blue", alpha = 0.6, color = "black") +
+  ggtitle("Distribution of duels won percentage") 
+
+ggplot(mydata, aes(x = forward_passes_per_90)) +
+  geom_histogram(binwidth = 1, fill = "red", alpha = 0.6, color = "black") +
+  ggtitle("Distribution of forward passes per 90") 
+
+ggplot(mydata, aes(x = height )) +
+  geom_histogram(bins = 30, fill = "red", alpha = 0.5) +
+  theme_minimal() +
+  ggtitle("Histogram of height")
+
+ggplot(mydata, aes(x =  passes_per_90)) +
+  geom_histogram(binwidth = 1, fill = "blue", alpha = 0.6, color = "black") +
+  ggtitle("Distribution of passes per 90") 
+
+ggplot(mydata, aes(x =  passes_to_final_third_per_90)) +
+  geom_histogram(binwidth = 1, fill = "red", alpha = 0.6, color = "black") +
+  ggtitle("Distribution of  passes to final third per 90") 
+
+ggplot(mydata, aes(x = passes_to_penalty_area_per_90)) +
+  geom_histogram(bins = 30, fill = "blue", alpha = 0.5) +
+  theme_minimal() +
+  ggtitle("Histogram of passes to penalty area per 90")
+
+ggplot(mydata, aes(x = shots )) +
+  geom_histogram(bins = 30, fill = "red", alpha = 0.5) +
+  theme_minimal() +
+  ggtitle("Histogram of shots")
+
+ggplot(mydata, aes(x =  shots_per_90)) +
+  geom_histogram(binwidth = 1, fill = "blue", alpha = 0.6, color = "black") +
+  ggtitle("Distribution of shots per 90") 
+
+ggplot(mydata, aes(x = weight)) +
+  geom_histogram(binwidth = 10, fill = "red", alpha = 0.6, color = "black") +
+  ggtitle("Distribution of weight") 
+
+```
+
+```{r}
+#qqplots
+# QQ-plot for Age
+qqnorm(mydata$age, main = "age")
+qqline(mydata$age, col = "red")
+
+# QQ-plot for Accurate Passes Percentage
+qqnorm(mydata$dribbles_per_90, main = "Accurate Passes Percentage")
+qqline(mydata$dribbles_per_90, col = "red")
+
+## QQ-plot for dribbles per 90
+qqnorm(mydata$dribbles_per_90, main = "dribbles per 90")
+qqline(mydata$dribbles_per_90, col = "red")
+
+## QQ-plot for Shots
+qqnorm(mydata$shots, main = "Shots")
+qqline(mydata$shots, col = "red")
+
+# QQ-plot for matches played
+qqnorm(mydata$matches_played, main = "matches played")
+qqline(mydata$matches_played, col = "red")
+
+# QQ-plot for minutes played
+qqnorm(mydata$minutes_played, main = "minutes played")
+qqline(mydata$minutes_played, col = "red")
+
+## QQ-plot for accurate forward passes percentage
+qqnorm(mydata$accurate_forward_passes_percentage, main = "accurate forward passes percentage")
+qqline(mydata$accurate_forward_passes_percentage, col = "red")
+
+## QQ-plot for accurate lateral passes percentage
+qqnorm(mydata$accurate_lateral_passes_percentage, main = "accurate lateral passes percentage")
+qqline(mydata$accurate_lateral_passes_percentage, col = "red")
+
+# QQ-plot for back passes per 90
+qqnorm(mydata$back_passes_per_90, main = "back passes per 90")
+qqline(mydata$back_passes_per_90, col = "red")
+
+# QQ-plot for duels per 90
+qqnorm(mydata$duels_per_90, main = "duels per 90")
+qqline(mydata$duels_per_90, col = "red")
+
+## QQ-plot for duels won percentage
+qqnorm(mydata$duels_won_percentage, main = "duels won percentage")
+qqline(mydata$duels_won_percentage, col = "red")
+
+## QQ-plot for forward passes per 90
+qqnorm(mydata$forward_passes_per_90, main = "forward passes per 90")
+qqline(mydata$forward_passes_per_90, col = "red")
+
+# QQ-plot for height
+qqnorm(mydata$height, main = "height")
+qqline(mydata$height, col = "red")
+
+# QQ-plot for passes_per_90
+qqnorm(mydata$passes_per_90, main = "passes_per_90")
+qqline(mydata$passes_per_90, col = "red")
+
+## QQ-plot for  passes to final third per 90
+qqnorm(mydata$passes_to_final_third_per_90, main = "final third per 90")
+qqline(mydata$passes_to_final_third_per_90, col = "red")
+
+## QQ-plot for passes to penalty area per 90
+qqnorm(mydata$passes_to_penalty_area_per_90, main = "passes to penalty area per 90")
+qqline(mydata$passes_to_penalty_area_per_90, col = "red")
+
+## QQ-plot for shots per 90
+qqnorm(mydata$shots_per_90, main = "shots per 90")
+qqline(mydata$shots_per_90, col = "red")
+
+## QQ-plot for passes to weight
+qqnorm(mydata$weight, main = "weight")
+qqline(mydata$weight, col = "red")
+```
+
+```{r}
+# 1. substract numeric variables
+num_vars <- mydata[, sapply(mydata, is.numeric)]
+
+#Scatter Matrix
+pairs(num_vars, pch = 19, col = rgb(0, 0.5, 1, 0.3), main = "Scatterplot Matrix of Numeric Variables")
+
+# 2. pearson correlation
+cor_matrix <- cor(num_vars, use = "complete.obs", method = "pearson")
+print(cor_matrix)
+```
+
+
+```{r}
+##boxplot
+boxplot(mydata$matches_played, main = "Matches Played", col = "lightblue", las = 2)
+boxplot(mydata$minutes_played, main = "Minutes Played", col = "lightblue", las = 2)
+boxplot(mydata$age, main = "Age", col = "lightblue", las = 2)
+boxplot(mydata$accurate_forward_passes_percentage, main = "Accurate Forward Passes Percentage", col = "lightblue", las = 2)
+boxplot(mydata$accurate_lateral_passes_percentage, main = "Accurate Lateral Passes Percentage", col = "lightblue", las = 2)
+boxplot(mydata$accurate_passes_percentage, main = "Accurate Passes Percentage", col = "lightblue", las = 2)
+boxplot(mydata$back_passes_per_90, main = "Back Passes per 90", col = "lightblue", las = 2)
+boxplot(mydata$dribbles_per_90, main = "Dribbles per 90", col = "lightblue", las = 2)
+boxplot(mydata$duels_per_90, main = "Duels per 90", col = "lightblue", las = 2)
+boxplot(mydata$duels_won_percentage, main = "Duels Won Percentage", col = "lightblue", las = 2)
+boxplot(mydata$forward_passes_per_90, main = "Forward Passes per 90", col = "lightblue", las = 2)
+boxplot(mydata$height, main = "Height", col = "lightblue", las = 2)
+boxplot(mydata$passes_per_90, main = "Passes per 90", col = "lightblue", las = 2)
+boxplot(mydata$passes_to_final_third_per_90, main = "Passes to Final Third per 90", col = "lightblue", las = 2)
+boxplot(mydata$passes_to_penalty_area_per_90, main = "Passes to Penalty Area per 90", col = "lightblue", las = 2)
+boxplot(mydata$shots, main = "Shots", col = "lightblue", las = 2)
+boxplot(mydata$shots_per_90, main = "Shots per 90", col = "lightblue", las = 2)
+boxplot(mydata$weight, main = "Weight", col = "lightblue", las = 2)
+
+```
+```{r}
+##passes_per_90&forward_passes_per_90
+scatterplot(mydata[, "passes_per_90"], mydata[, "forward_passes_per_90"], pch=19, smooth=FALSE, regLine=FALSE, grid=FALSE, xlab="passes_per_90", ylab="forward_passes_per_90",  main="Scatter Plot of passes_per_90 and forward_passes_per_90")
+
+##passes_per_90&passes_to_final_third_per_90
+scatterplot(mydata[, "passes_per_90"], mydata[, "passes_to_final_third_per_90"], pch=19, smooth=FALSE, regLine=FALSE, grid=FALSE, xlab="passes_per_90", ylab="passes_to_final_third_per_90", main="Scatter Plot of passes_per_90 and passes_to_final_third_per_90")
+
+##accurate_passes_percentage&accurate_lateral_passes_percentage
+scatterplot(mydata[, "accurate_passes_percentage"], mydata[, "accurate_lateral_passes_percentage"], pch=19, smooth=FALSE, regLine=FALSE, grid=FALSE, xlab="accurate_passes_percentage", ylab="accurate_lateral_passes_percentage", main="Scatter Plot of accurate_passes_percentage and accurate_lateral_passes_percentage")
+
+##forward_passes_per_90&shots_per_90
+scatterplot(mydata[, "forward_passes_per_90"], mydata[, "shots_per_90"], pch=19, smooth=FALSE, regLine=FALSE, grid=FALSE, xlab="forward_passes_per_90", ylab="shots_per_90", main="Scatter Plot of forward_passes_per_90 and shots_per_90")
+```
+
+
+### Discussion:
+All observations are from attack position; most of the players use right foot while 1 can use both foot and for another player it is unknown
+
+Skewness
+Right skewed variables(caused by elite players) such as Shots, Dribbles per 90, Minutes played, Matches played, Back passes per 90, Duels per 90, Forward passes per 90, Passes to final third per 90, Passes to penalty area per 90, Shots per 90
+Approximately Symmetric Variables such as Age, Accurate forward passes percentage, Accurate lateral passes percentage, Accurate passes percentage, Duels won percentage, Height, Weight
+
+Outlier
+Variables with Significant Outliers such as Dribbles per 90, Shots, passes_to_penalty_area_per_90, height, weight,passes_to_final_third_per_90
+In such variables mostly outliers are caused by elite players' performance, while in height and weight both of them has observations of 0, which could be missing data.
+
+Correlations
+Strong Positive Correlations (r > 0.7):passes_per_90&forward_passes_per_90 (r ≈ 0.84), passes_per_90&passes_to_final_third_per_90 (r ≈ 0.78), accurate_passes_percentage&accurate_lateral_passes_percentage(r ≈ 0.70) ==>Since the postition is attack, most passes players do is related to to pass the ball forward to create threats 
+Strong Negative Correlations (r < -0.5)：forward_passes_per_90&shots_per_90 (r ≈ -0.58)==> This implies attackers who passes a lot to create opportunities of shots don't shoot much, the final striker is more likely to stay in the box.
+Age is weakly correlated with most variables
+
+## Question 2
+
+```{r}
+## QQ-plot for dribbles per 90
+qqnorm(mydata$dribbles_per_90, main = "dribbles_per_90")
+qqline(mydata$dribbles_per_90, col = "red")
+
+## QQ-plot for Shots
+qqnorm(mydata$shots, main = "shots")
+qqline(mydata$shots, col = "red")
+
+
+# Histograms
+ggplot(mydata, aes(x = shots)) +
+  geom_histogram(bins = 30, fill = "blue", alpha = 0.5) +
+  theme_minimal() +
+  ggtitle("Histogram of Shots")
+
+ggplot(mydata, aes(x = dribbles_per_90 )) +
+  geom_histogram(bins = 30, fill = "red", alpha = 0.5) +
+  theme_minimal() +stat_boxplot(geom = "errorbar", width = 0.2) + # adds the horizontal lines at the end of the whiskers
+  geom_boxplot() + 
+  ggtitle("Histogram of Dribbles per 90")
+
+
+
+#Shapiro test
+shapiro.test(mydata$shots)
+shapiro.test(mydata$dribbles_per_90)
+```
+
+```{r}
+#boxplot
+boxplot(mydata$dribbles_per_90, col = "darkgoldenrod1", ylab = "", outpch = 19)
+points(1, mean(mydata$dribbles_per_90), pch = 18, col = "firebrick", cex = 1.5)
+mtext(side = 2, text = expression(paste("shots")), line = 3)
+boxplot(mydata$shots, col = "darkgoldenrod1", ylab = "", outpch = 19)
+points(1, mean(mydata$shots), pch = 18, col = "firebrick", cex = 1.5)
+mtext(side = 2, text = expression(paste("shots")), line = 3)
+#adjusted boxplot
+robustbase::adjbox(mydata$dribbles_per_90, col = "darkgoldenrod1", ylab = "", 
+                   outpch = 19)
+points(1, mean(mydata$shots), pch = 18, col = "firebrick", cex = 1.5)
+mtext(side = 2, text = expression(paste("dribbles_per_90")), line = 3)
+
+robustbase::adjbox(mydata$shots, col = "darkgoldenrod1", ylab = "", 
+                   outpch = 19)
+points(1, mean(mydata$shots), pch = 18, col = "firebrick", cex = 1.5)
+mtext(side = 2, text = expression(paste("shots")), line = 3)
+
+outliers_shots <- adjboxStats(mydata$shots)$out
+print(outliers_shots) 
+outliers_dribbles_per_90 <- adjboxStats(mydata$dribbles_per_90)$out
+print(outliers_dribbles_per_90) 
+```
+```{r}
+# Remove the most extreme outlier
+mydata$dribbles_per_90 <- rm.outlier(mydata$dribbles_per_90, fill = TRUE)  # Replace outliers with NA
+clean_data <- na.omit(data)  # Remove NA values
+print(clean_data)
+shapiro.test(mydata$dribbles_per_90)
+
+mydata$shots <- rm.outlier(mydata$shots, fill = TRUE)  # Replace outliers with NA
+clean_data1 <- na.omit(data)  # Remove NA values
+print(clean_data1)
+shapiro.test(mydata$shots)
+
+```
+```{r}
+model <- lm(shots + 0.1 ~ 1, data = mydata)
+
+# Calculate λ
+boxcox_result <- boxCox(model, lambda = seq(-2, 2, 0.1))  
+lambda_optimal <- boxcox_result$x[which.max(boxcox_result$y)] 
+lambda_optimal  
+
+# Boxcox transformation
+transshots <- bcPower(mydata$shots + 0.1, lambda_optimal)
+
+# QQ plot to confirm normality
+qqnorm(transshots, pch = 19, main = "Normal Q-Q Plot of Box-Cox Transformed Data")
+qqline(transshots, col = "red")
+
+# Boxplot to observe distribution
+car::Boxplot(transshots, col = "darkgoldenrod1", outpch = 19)
+shapiro.test(transshots)
+
+hist(transshots, freq = FALSE, col = "skyblue1", 
+     main = "Distribution of Box-Cox Transformed Shots",
+     xlab = "Transformed Values")
+
+model <- lm(dribbles_per_90 + 0.1 ~ 1, data = mydata)
+
+boxcox_result <- boxCox(model, lambda = seq(-2, 2, 0.1))  
+lambda_optimal <- boxcox_result$x[which.max(boxcox_result$y)] 
+lambda_optimal  
+
+transdribbles_per_90 <- bcPower(mydata$dribbles_per_90 + 0.1, lambda_optimal)
+
+qqnorm(transdribbles_per_90, pch = 19, main = "Normal Q-Q Plot of Box-Cox Transformed Data")
+qqline(transdribbles_per_90, col = "red")
+
+car::Boxplot(transdribbles_per_90, col = "darkgoldenrod1", outpch = 19)
+shapiro.test(transdribbles_per_90)
+
+hist(transdribbles_per_90, freq = FALSE, col = "skyblue1", 
+     main = "Distribution of Box-Cox Transformed dribbles_per_90",
+     xlab = "Transformed Values")
+```
+
+### Discussion:
+QQplots and histograms both show that original shots and dribbles_per_90 are right-skewed variables
+Because SW tests yield P-values<0.05, reject the assumption of normality for both variables, their transformations are needed
+In normal boxplots a lot of observations are flagged as outliers because of skewness. So robust boxplot is applied. In robust boxplot, there is still 1 outlier for dribbles_per_90 and 1 for shots.
+After removing the outlier of dribbles_per_90 and shots, SW tests still reject normality because of P-values<0.05. Then boxcox transformations were applied on both variables.
+Both transformed datasets fail to reject normality according to SW tests, and normality is observed in their QQ plots and histograms. However, there is still an outlier according to boxplot for transformed dribbles_per_90.
+In the following questions, both transformed shots and transformed dribbles_per_90 are used.
+
+
+## Question 3
+
+```{r}
+  mydata$trans_shots <- transshots
+  mydata$trans_dribbles <- transdribbles_per_90
+
+# Create scatter plot 
+plot(mydata$trans_shots, mydata$trans_dribbles,
+     pch = 16, col = "blue",xlim = c(-4, 14),  
+     ylim = c(-2, 5), 
+     xlab = "trans_Shots", ylab = "trans_Dribbles per 90",
+     main = "Scatter Plot with 99% Tolerance Ellipse")
+
+# Calculate classical mean and covariance (as in wine example)
+cl_mean <- colMeans(mydata[, c("trans_shots", "trans_dribbles")])
+cl_cov <- cov(mydata[, c("trans_shots", "trans_dribbles")])
+
+# Add 99% classical tolerance ellipse 
+ellipse(center = cl_mean, 
+        shape = cl_cov, 
+        radius = sqrt(qchisq(0.99, df = 2)),
+        col = "red", lwd = 2)
+
+# Add mean lines 
+abline(h = cl_mean[2], lty = 2, col = "darkgreen")
+abline(v = cl_mean[1], lty = 2, col = "darkgreen")
+
+# Calculate points outside ellipse 
+mahal_dist <- mahalanobis(mydata[, c("trans_shots", "trans_dribbles")],
+                         center = cl_mean,
+                         cov = cl_cov)
+
+# Add legend (similar to style in your files)
+legend("topright", 
+       legend = c("Data points", "99% Tolerance Ellipse", "Variable Means"),
+       col = c("blue", "red", "darkgreen"),
+       pch = c(16, NA, NA),
+       lty = c(NA, 1, 2),
+       lwd = c(NA, 2, 1))
+```
+```{r}
+# Robust MCD Ellipse
+plot(mydata$trans_shots, mydata$trans_dribbles,
+     pch = 16, col = "blue",
+     xlim = c(-4, 14), ylim = c(-2, 5),
+     xlab = "trans Shots", ylab = "trans Dribbles per 90",
+     main = "Robust MCD Ellipse (25% breakdown)")
+
+# calculate mcd
+mcd <- robustbase::covMcd(mydata[, c("trans_shots", "trans_dribbles")], alpha = 0.75)
+
+# Draw mcd ellipse
+car::ellipse(center = mcd$center, 
+            shape = mcd$cov, 
+            radius = sqrt(qchisq(0.99, df = 2)),
+            col = "purple", lwd = 2, add = TRUE)
+
+# legend
+legend("topright",
+       legend = c("Data", "MCD (25%)"),
+       col = c("blue", "purple"),
+       pch = c(16, NA, NA),
+       lty = c(NA, 1, 1),
+       lwd = c(NA, 2, 2))
+```
+
+```{r}
+##Plot them in one graph
+scatterplot(mydata$trans_shots, mydata$trans_dribbles, pch=16, smooth=FALSE, regLine=FALSE, grid=FALSE, xlab="Transformed Shots", ylab="Transformed Dribbles per 90", xlim=c(-4, 14), ylim=c(-2, 5), main="Scatter Plot of 99% Tolerance Ellipse and Robust MCD Ellipse")
+
+cov_matrix <- cov(mydata[, c("trans_shots", "trans_dribbles")])
+mean_vector <- colMeans(mydata[, c("trans_shots", "trans_dribbles")])
+cutoff <- sqrt(qchisq(0.99, df = 2))
+car::ellipse(center = mean_vector, shape = cov_matrix, radius = cutoff, col = "firebrick")
+
+
+data.mcd.75 <- robustbase::covMcd(mydata[, c("trans_shots", "trans_dribbles")], alpha = 0.75)
+car::ellipse(center = data.mcd.75$center, shape = data.mcd.75$cov, radius = cutoff, col = "dodgerblue3")
+
+legend(x = 7.3, y = 1 , legend = c("Classical 99% Ellipse", "Robust MCD (α = 0.75)"), col = c("firebrick", "dodgerblue3"), lwd = 2, cex = 0.9)
+  
+
+# Caculate axises of classical ellipse
+classical_axes <- sqrt(eigen(cl_cov)$values) * sqrt(qchisq(0.99, 2))
+classical_major <- max(classical_axes)  
+classical_minor <- min(classical_axes) 
+
+# Caculate axises of MCD ellipse
+mcd_axes <- sqrt(eigen(mcd$cov)$values) * sqrt(qchisq(0.99, 2)) 
+mcd_major <- max(mcd_axes)              
+mcd_minor <- min(mcd_axes)              
+
+ellipse_axes <- data.frame(
+  Method = c("Classical", "MCD Robust"),
+  Major_Axis = c(classical_major, mcd_major),
+  Minor_Axis = c(classical_minor, mcd_minor),
+  stringsAsFactors = FALSE
+)
+
+knitr::kable(ellipse_axes, digits = 4, 
+             caption = "Semi-Axis Lengths of 99% Tolerance Ellipses")
+
+# DD plot
+# calculate the distances
+md_classical <- mahalanobis(mydata[, c("trans_shots", "trans_dribbles")], 
+                           center = cl_mean, cov = cl_cov)
+md_mcd <- mahalanobis(mydata[, c("trans_shots", "trans_dribbles")], 
+                     center = mcd$center, cov = mcd$cov)
+
+# Draw DD Plot
+plot(md_classical, md_mcd, pch = 16, col = "blue",
+     xlab = "Classical Mahalanobis Distance", 
+     ylab = "Robust MCD Distance",
+     main = "Distance-Distance Plot")
+abline(a = 0, b = 1, lty = 2, col = "red") 
+abline(h = qchisq(0.99, 2), v = qchisq(0.99, 2), col = "gray")  
+
+# Flag data ruled out by MCD
+outliers <- which(mcd$mcd.wt == 0)
+points(md_classical[outliers], md_mcd[outliers], pch = 1, cex = 1.5, col = "red")
+
+# Calculate classical center (mean)
+cl_mean <- colMeans(mydata[, c("trans_shots", "trans_dribbles")])
+
+# Calculate MCD center (robust)
+mcd <- robustbase::covMcd(mydata[, c("trans_shots", "trans_dribbles")], alpha = 0.75)
+
+# Create a comparison table
+center_comparison <- data.frame(
+  Method = c("Classical", "MCD Robust"),
+  trans_shots = c(cl_mean[1], mcd$center[1]),
+  trans_dribbles = c(cl_mean[2], mcd$center[2]),
+  stringsAsFactors = FALSE
+)
+
+# Print formatted output
+knitr::kable(center_comparison, digits = 4, 
+             caption = "Center Coordinates of 99% Tolerance Ellipses")
+
+# Calculate Mahalanobis distance
+cl_mahal <- mahalanobis(mydata[, c("trans_shots", "trans_dribbles")], 
+                       center = cl_mean, cov = cl_cov)
+mcd_mahal <- mcd$mah  
+
+# define 99% chi
+cutoff_sq <- qchisq(0.99, df = 2)  
+
+# calculate percentage of outliers
+cat("Outlier Percentages (99% tolerance)\n")
+cat(sprintf("Classical ellipse: %.2f%%\n", 
+            mean(cl_mahal > cutoff_sq) * 100))
+cat(sprintf("MCD ellipse (25%% breakdown): %.2f%%\n", 
+            mean(mcd_mahal > cutoff_sq) * 100))
+
+# identify outlier
+cl_outliers <- which(cl_mahal > cutoff_sq)
+mcd_outliers <- which(mcd_mahal > cutoff_sq)
+cat(sprintf("\nOutlier indices:\nClassical: %s\nMCD: %s\n",
+            paste(cl_outliers, collapse = ","),
+            paste(mcd_outliers, collapse = ",")))
+```
+
+### Discussion:
+Comparison of Classical vs MCD Ellipses
+Size and shape:
+The robust ellipse is only slightly bigger as the classical one, because the transformed datasets are close to normality and have only 1 outlier flagged in both ellipses.
+
+Center location:
+The ellipses have similar centers with the classical one slightly lower and more to the left, because of its sensitivity to the outlier.
+
+From DD plot we can see only 3 data was ruled by MCD compared to classical one which also proves the MCD and the classical one are similar
+## Question 4
+
+```{r}
+# Remove 'foot' variable and select numeric columns (as in your Q1 approach)
+football_numeric <- mydata[, !(colnames(mydata) %in% c("foot","shots","dribbles_per_90","position"))]  # Exclude categoricals
+
+# Check structure (like your str() checks)
+str(football_numeric)
+```
+### Discussion:
+Standarization is needed for the dataset because the variables have different units and ranges
+
+```{r}
+set.seed(50)
+football_robpca <- rrcov::PcaHubert(football_numeric, scale = mad, k = ncol(football_numeric), kmax=18)
+
+summary(football_robpca) 
+
+mydata_robpca.prcomp <- getPrcomp(football_robpca)
+fviz_eig(mydata_robpca.prcomp, choice="eigenvalue",addlabels=T)
+fviz_eig(mydata_robpca.prcomp, addlabels=T)
+
+plot(cumsum(football_robpca$eigenvalues)/sum(football_robpca$eigenvalues), type="b", pch=19,
+main="Cumulative Variance Explained by PCA Components", xlab="PCA component", ylab="Cumulative variance")
+abline(h=0.8, col="blue", lty=2, lwd=1.5)
+abline(h=0.9, col="blue", lty=3, lwd=1.5)
+football_robpca <- rrcov::PcaHubert(football_numeric, scale = mad, k = 6, crit.pca.distances = 0.99)
+```
+### Discussion:
+According to the scree plot of eigenvalues(>1) and the plot of cumulative variance(>0.8/0.9), 6 PCs is decided because the component with the 7th largest cumulative variance is bigger than 0.8 but the slope between the 6th and the 7th is obviously steeper than that between the 7th and 8th. So 6 PCs explains over 80% of the variances and  doesn't have too many PCs to complicate the model.
+```{r}
+football_robpca@loadings
+loadings_6pc <- football_robpca@loadings[, 1:6]
+corrplot(loadings_6pc, is.corr = TRUE,method = "number",
+         tl.col = "black", tl.cex = 0.8,
+         number.cex = 0.7, tl.srt = 45)
+plot(football_robpca, pch=19, id.n.od=6)
+```
+### Discussion:
+Most points cluster in the bottom-left corner, indicating regular observations with low distances. Points in the top-right corner have both high score and orthogonal distances, identifying them as outliers because they differ significantly from the rest of the data both in position and fit. A few points with mildly high score distance but with low orthogonal distance and a few points with mildly high orthogonal distance but low score distance are also detected.
+```{r}
+# Perform Robust PCA
+football_robpca <- PcaHubert(football_numeric, scale = mad)
+
+# Get cutoff values 
+cutoff_sd <- football_robpca$cutoff.sd  # Score distance cutoff
+cutoff_od <- football_robpca$cutoff.od  # Orthogonal distance cutoff
+
+# Find ALL OUTLIERS (for comparison)
+outliers_all <- which(football_robpca$sd > cutoff_sd | football_robpca$od > cutoff_od)
+
+# Find BAD LEVERAGE POINTS (high SD AND high OD)
+bad_leverage <- which(football_robpca$sd > cutoff_sd & football_robpca$od > cutoff_od)
+
+# Find GOOD LEVERAGE POINTS (high SD only)
+good_leverage <- which(football_robpca$sd > cutoff_sd & football_robpca$od <= cutoff_od)
+
+# View and remove only bad leverage points
+cat("Detected", length(bad_leverage), "bad leverage points:\n", bad_leverage)
+print(football_numeric[bad_leverage, ])  # Inspect these rows
+
+# Create cleaned dataset (without bad leverage points)
+clean_data <- football_numeric[-bad_leverage, ]
+
+# Verify dimensions
+cat("\nOriginal dimensions:", dim(football_numeric))
+cat("\nCleaned dimensions:", dim(clean_data))
+
+# Get orthogonal outliers (high OD but low SD)
+orthogonal_outliers <- which(
+  football_robpca$od > cutoff_od & 
+  football_robpca$sd <= cutoff_sd
+)
+
+# View their data
+football_numeric[orthogonal_outliers, ]
+
+```
+### Discussion:
+All the bad leverages are removed. Good leverages are kept since no data error detected in the view.
+
+## Question 5
+
+
+### Part a
+
+```{r}
+## Classical PCA Analysis
+# Perform classical PCA with standardization
+classical_pca <- PcaClassic(clean_data, scale=TRUE)
+
+mydata_robpca.prcomp <- getPrcomp(classical_pca)
+fviz_eig(mydata_robpca.prcomp, choice="eigenvalue",addlabels=T)
+fviz_eig(mydata_robpca.prcomp, addlabels=T)
+
+plot(cumsum(classical_pca$eigenvalues)/sum(classical_pca$eigenvalues), type="b", pch=19,
+main="Cumulative Variance Explained by PCA Components", xlab="PCA component", ylab="Cumulative variance")
+abline(h=0.8, col="blue", lty=2, lwd=1.5)
+abline(h=0.9, col="blue", lty=3, lwd=1.5)
+classical_pca <- PcaClassic(clean_data, scale = TRUE, k = 6, crit.pca.distances = 0.99)
+
+```
+### Discussion:
+According to the scree plot of eigenvalues and the plot of cumulative variance(>0.8/0.9), 6 PCs is decided because the component with the 7th largest cumulative variance is bigger than 0.8 and the slope between the 6th and the 7th is obviously steeper than that between the 7th and 8th. So 6 PCs explains over 80% of the variances and  doesn't have to many PCs to complicate the model.
+
+### Part b
+
+```{r}
+scaled_data <- scale(clean_data)
+# Correlation between variables and PCs
+cor_matrix <- cor(scaled_data, classical_pca$scores)
+corrplot(cor_matrix[, 1:6],  
+         method = "color",
+         type = "full",
+         tl.col = "black", 
+         tl.srt = 45,
+         addCoef.col = "black",  # Show correlation coefficients
+         number.cex = 0.5,
+         col = colorRampPalette(c("blue", "white", "red"))(100),)
+```
+
+
+### Discussion:
+PC1 is strongly positively correlated with "passes per 90" and "forward passes per 90""passes to final third per 90""duels won percentage" and is most negatively correlated with "shots per 90". PC2 is positively correlated with "matches played""minutes played""transformed shots"and is most negatively correlated with "accurate forward passes percentage". PC3 is positively correlated with "accurate lateral passes percentage""accurate passes percentage"and is most negatively correlated with "passes to penalty area per 90". PC4 is most positively correlated with "transformed dribbles per 90" and "transformed shots" and is most negatively correlated with "height". PC5 is most positively correlated with "age" and most negatively correlated with "duels per 90". PC6 is most positively correlated with age and most negatively correlated with matches played.
+
+### Part c
+
+```{r}
+scaled_data.prcomp<- getPrcomp(classical_pca)
+fviz_pca_biplot(scaled_data.prcomp, axes=c(1,2), label="var", col.var="red", repel=TRUE, ggtheme = theme_classic())
+
+fviz_pca_biplot(scaled_data.prcomp, axes=c(2,3), label="var", col.var="red", repel=TRUE, ggtheme = theme_classic())
+
+fviz_pca_biplot(scaled_data.prcomp, axes=c(1,3), label="var", col.var="red", repel=TRUE, ggtheme = theme_classic())
+
+```
+
+
+### Discussion:
+According to the first biplot, variables related to passing like passes per 90, forward passes per 90 load heavily on PC1 positively while transformed dribbles per 90 has no influence on PC1, which means PC1 is likely to be related with attaker's involvement in attacking buildup; Age and matches played, minutes played have heavy loadings on PC2 positively while accurate forward passes percentage has the heaviest negative loading on it, which indicate that PC2 might be related to players' experience; Accurate lateral passes percentage has the heaviest positive loading on PC3 while passes to penalty area per 90 has the heaviest negative loading on it. Also from the biplots we can tell that the passing variables are closely related because their arrows have relatively small angles in between while for some variables like accurate passes percentage and height they are almost irrelevant with an angle near 90 degrees. In all, the discoveries from the biplots agree with those we got from the correlation plot. 
+
+
+### Part d
+
+```{r}
+# Prepare data frame
+pca_df <- data.frame(classical_pca$scores[, 1:3])
+adjusted_data<- mydata[-c(23,51,65,92,164,215,265,276,290,332,339,343,348,385),]
+pca_df$foot <- as.factor(adjusted_data$foot)
+
+# PC1 vs PC2
+ggplot(pca_df, aes(x = PC1, y = PC2, color = foot)) +
+  geom_point(size = 2) +
+  labs(title = "PC1 vs PC2 Colored by Foot") +
+  theme_minimal()
+
+# PC1 vs PC3
+ggplot(pca_df, aes(x = PC1, y = PC3, color = foot)) +
+  geom_point(size = 2) +
+  labs(title = "PC1 vs PC3 Colored by Foot") +
+  theme_minimal()
+
+# PC2 vs PC3
+ggplot(pca_df, aes(x = PC2, y = PC3, color = foot)) +
+  geom_point(size = 2) +
+  labs(title = "PC2 vs PC3 Colored by Foot") +
+  theme_minimal()
+
+```
+
+
+### Discussion:
+According to the scatterplot more players use right foot, while there's one player who can use both feet. Since the colors are roughly evenly mixed, foot preference does not strongly influence the variance captured by these PCs.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,611 @@
+---
+title: "G0O02a: Statistical Data Analysis: Project 2 - 2024/2025 Spring"
+author: "MA ZHIYUAN"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+# Load libraries here
+library(cluster)
+library(factoextra)
+library(corrplot)
+library(dendextend)
+library(fossil)
+library(vcd)
+library(moments)
+library(MASS)
+library(leaps)
+library(lmtest)
+library(robustbase)
+library(car)
+library(ggplot2)
+```
+
+# Loading Data
+
+```{r}
+# Load the dataset
+football_data <- read.csv2("Football_project2.csv",  stringsAsFactors = TRUE)
+set.seed(1015487) # replace with your student number
+data_ind <- sample.int(n = nrow(football_data), size = 300, replace = F)
+football_mydata <- football_data[data_ind, ]
+summary(football_mydata)
+```
+
+
+# Part 1: cluster analysis
+
+## Question 1
+
+```{r}
+# Remove clearly wrong data
+football_mydata_clean <- football_mydata[football_mydata$height != 0 & football_mydata$weight != 0, ]
+
+# Check how many rows were removed
+removed_rows <- nrow(football_mydata) - nrow(football_mydata_clean)
+message("Removed ", removed_rows, " rows with zero values in height or weight")
+
+# Update your dataset
+football_mydata <- football_mydata_clean
+
+# Verify the cleaning
+summary(football_mydata[c("height", "weight")])
+
+# Remove first three variables (market value, foot, position)
+football_cluster <- football_mydata[, -c(1:3)]
+
+# Check for missing values
+sum(is.na(football_cluster))
+
+# Standardize the data 
+football_scaled <- scale(football_cluster)
+
+print(football_mydata)
+
+```
+```{r}
+
+# Compute dissimilarity matrix (Euclidean distance)
+football_diss <- daisy(football_scaled, metric = "euclidean")
+
+```
+
+```{r}
+# Determine optimal number of clusters
+fviz_nbclust(football_scaled, kmeans, method = "silhouette")
+
+# Perform K-means with optimal k
+set.seed(123)
+kmeans_result <- kmeans(football_scaled, centers = 2, nstart = 50)
+# Calculate silhouette widths
+sil_width <- silhouette(kmeans_result$cluster, dist(football_scaled))
+
+# Get average silhouette width
+avg_sil_width <- mean(sil_width[, "sil_width"])
+cat("Average silhouette width:", round(avg_sil_width, 3), "\n")
+# Visualize clusters
+fviz_cluster(kmeans_result, data = football_scaled, 
+             ellipse.type = "convex",
+             palette = c("darkgoldenrod1", "firebrick2", "royalblue2"),
+             main = "K-means Clustering")
+# Plot the silhouette
+fviz_silhouette(sil_width,
+                palette = c("darkgoldenrod1", "firebrick2"),
+                ggtheme = theme_minimal(),
+                main = "Silhouette Plot for K-means (k = 2)")
+# Define color palette for clusters 
+colorsFootball <- c("blue3", "orange", "darkgreen")  # For up to 3 clusters
+
+pairs(football_scaled[, 1:18],  
+      pch = 19, 
+      col = colorsFootball[kmeans_result$cluster], 
+      main = "Football Data - K-means (k=2)",
+      cex = 0.8,  # Slightly smaller points
+      gap = 0.5)  # Add some space between plots
+```
+
+```{r}
+# Perform PAM clustering
+pam_result <- pam(football_scaled, k = 2)
+
+
+# Define color palette for clusters 
+colorsFootball <- c("blue3", "orange", "darkgreen")  # For up to 3 clusters
+
+# Perform PAM clustering with k=2
+football.pam2 <- cluster::pam(football_scaled, k = 2)
+
+# Visualize clusters using pairs plot 
+pairs(football_scaled[, 1:18],  # Showing first 5 variables for clarity
+      pch = 19, 
+      col = colorsFootball[football.pam2$cluster], 
+      main = "Football Data - K-medoids (k=2)",
+      cex = 0.8,  # Slightly smaller points
+      gap = 0.5)  # Add some space between plots
+
+# Enhanced silhouette plot 
+plot(silhouette(football.pam2), 
+     col = colorsFootball[1:2],  # Using first two colors
+     main = "Silhouette Plot of PAM Clustering (k=2)",
+     cex.names = 0.6,  # Adjust text size
+     max.strlen = 10)  # Control label length
+
+# Visualize clusters
+fviz_cluster(football.pam2, data = football_scaled, 
+             ellipse.type = "convex",
+             palette = c("darkgoldenrod1", "firebrick2", "royalblue2"),
+             main = "PAM Clust")
+fviz_cluster(football.pam2, data = football_scaled, 
+             ellipse.type = "norm",
+             palette = c("darkgoldenrod1", "firebrick2", "royalblue2"),
+             main = "PAM Clust")
+
+```
+
+```{r}
+# AGNES with complete linkage
+agnes_complete <- agnes(football_scaled, method = "complete")
+
+# Visualize dendrogram
+pltree(agnes_complete, cex = 0.6, hang = -1, 
+       main = "Dendrogram of AGNES (Complete Linkage)")
+
+# Cut tree to get clusters
+agnes_clusters <- cutree(agnes_complete, k = 2)
+
+
+# Visualize clusters
+fviz_cluster(list(data = football_scaled, cluster = agnes_clusters),
+             ellipse.type = "norm",
+             palette = c("darkgoldenrod1", "firebrick2", "royalblue2"),
+             main = "AGNES Clustering")
+fviz_cluster(list(data = football_scaled, cluster = agnes_clusters),
+             ellipse.type = "convex",
+             palette = c("darkgoldenrod1", "firebrick2", "royalblue2"),
+             main = "AGNES Clustering")
+diss <- dist(football_scaled)
+colors.agnes.obs <- c("darkgoldenrod1", "turquoise4", "indianred2", "blueviolet")
+pairs(football_scaled, col = colors.agnes.obs[agnes_clusters], pch = 16, cex = 0.8,
+      lower.panel = NULL, xaxt = "n", yaxt = "n", gap = 0)
+# silhouette plot
+agnes_sil <- silhouette(agnes_clusters, diss)
+
+plot(agnes_sil, 
+     col = colorsFootball[1:2], 
+     main = "Silhouette Plot of AGNES Clustering (k=2)",
+     cex.names = 0.6, 
+     max.strlen = 10)
+```
+
+```{r}
+# DIANA clustering
+diana_result <- diana(football_scaled)
+
+# Visualize dendrogram
+pltree(diana_result, cex = 0.6, hang = -1, 
+       main = "Dendrogram of DIANA")
+
+# Cut tree to get clusters
+diana_clusters <- cutree(diana_result, k = 2)
+
+diana_sil <- silhouette(diana_clusters, diss)
+
+# silhouette plot
+plot(diana_sil, 
+     col = colorsFootball[1:2],  
+     main = "Silhouette Plot of DIANA Clustering (k=2)",
+     cex.names = 0.6,
+     max.strlen = 10)
+
+# Visualize clusters
+fviz_cluster(list(data = football_scaled, cluster = diana_clusters),
+             ellipse.type = "norm",
+             palette = c("darkgoldenrod1", "firebrick2", "royalblue2"),
+             main = "DIANA Clustering")
+fviz_cluster(list(data = football_scaled, cluster = diana_clusters),
+             ellipse.type = "convex",
+             palette = c("darkgoldenrod1", "firebrick2", "royalblue2"),
+             main = "DIANA Clustering")
+colors.diana.obs <- c("darkgoldenrod1", "turquoise4", "indianred2", "blueviolet")
+pairs(football_scaled, col = colors.diana.obs[diana_clusters], pch = 16, cex = 0.8,
+      lower.panel = NULL, xaxt = "n", yaxt = "n", gap = 0)
+
+```
+
+```{r}
+# Silhouette analysis
+sil_pam <- silhouette(pam_result)
+sil_agnes <- silhouette(agnes_clusters, football_diss)
+sil_diana <- silhouette(diana_clusters, football_diss)
+
+# Compare average silhouette widths
+cat("PAM average silhouette width:", mean(sil_pam[, "sil_width"]), "\n")
+cat("AGNES average silhouette width:", mean(sil_agnes[, "sil_width"]), "\n")
+cat("DIANA average silhouette width:", mean(sil_diana[, "sil_width"]), "\n")
+
+# Compare clusterings using Rand index
+rand_pam_agnes <- rand.index(pam_result$clustering, agnes_clusters)
+rand_pam_diana <- rand.index(pam_result$clustering, diana_clusters)
+rand_agnes_diana <- rand.index(agnes_clusters, diana_clusters)
+
+cat("Rand index PAM vs AGNES:", rand_pam_agnes, "\n")
+cat("Rand index PAM vs DIANA:", rand_pam_diana, "\n")
+cat("Rand index AGNES vs DIANA:", rand_agnes_diana, "\n")
+```
+
+### Discussion:
+I chose K=2, because according to the silhouette analysis of kmeans, 2 is the optimal number of clusters. And later when applied k=2/3 to PAM, DIANA, AGNES, k=2 still has the wider average silhouette width. Among different ways of clustering, PAM is chosen at last, with an average silhouette width of 0.24, which is suggesting no substantial structure.It is only smaller than that of Agnes, and according to the pairs plots, the PAM clustering is more interpretable. Thus it is chosen for the rest of the assignment.And the clustering method poorly classifies the observations into 2 clusters because the some negative silhouette width can be seen in cluster 1 of the PAM cluster. And when looking at the cluster plot, different extents of overlaps can be seen as well, indicating some data misclassified and not so well separated clusters.
+
+
+## Question 2
+
+```{r}
+pca_result <- prcomp(football_scaled)
+# Reorder the rows of football_scaled based on PAM cluster assignment
+pam_order <- order(football.pam2$cluster)
+ordered_data <- football_scaled[pam_order, ]
+
+# Create a heatmap 
+heatmap(data.matrix(ordered_data), 
+        scale = "column",
+        Rowv = NA, Colv = NA,
+        col = corrplot::COL2("BrBG"),
+        revC = TRUE,
+        cexCol = 0.8,
+        labRow = FALSE,
+        main = "Heatmap Ordered by PAM Clusters")
+
+# PCA result 
+pca_result <- prcomp(football_scaled)
+
+# PAM clusters
+fviz_pca_biplot(pca_result, 
+                habillage = as.factor(football.pam2$cluster),
+                addEllipses = TRUE,
+                palette = c("blue3", "orange"),
+                ggtheme = theme_minimal(),
+                title = "PCA Biplot Colored by PAM Clusters (k=2)")
+
+# Reorder data and clusters
+pam_order <- order(football.pam2$cluster)
+ordered_data <- football_scaled[pam_order, ]
+ordered_clusters <- football.pam2$cluster[pam_order]
+
+# Pairs plot
+pairs(ordered_data[, 1:18],  # You can change to other variables or more columns
+      pch = 19, 
+      col = colorsFootball[ordered_clusters], 
+      main = "Pairs Plot Ordered by PAM Clusters",
+      cex = 0.8,
+      gap = 0.5)
+
+
+```
+
+
+### Discussion:
+According to the biplot, players in cluster 1 tend to locate on the right of x axis, while cluster 2 is largely concentrated on the negative side of PC1. From the heatmap, we can see players in cluster 1 mostly have higher values than cluster 2 in column like the dribbles_per_90, which is often performed by attackers. But the divides are not so clear.
+
+
+## Question 3
+
+```{r}
+# 1. Compare with 'foot' variable
+foot_var <- football_mydata$foot
+
+# Create contingency table
+foot_table <- table(Foot = foot_var, Cluster = football.pam2$cluster)
+print(foot_table)
+
+# Mosaic plot for visualization
+mosaicplot(foot_table, 
+           color = c("darkgoldenrod1", "firebrick2"),
+           main = "Cluster Distribution by Preferred Foot",
+           xlab = "Preferred Foot", 
+           ylab = "Cluster")
+```
+```{r}
+# Compare with 'position' variable
+position_var <- football_mydata$position
+
+# Create contingency table and statistical tests
+position_table <- table(Position = position_var, Cluster = football.pam2$cluster)
+print(position_table)
+
+# Mosaic plot for visualization
+mosaicplot(position_table, 
+           color = hcl.colors(ncol(position_table)),
+           main = "Cluster Distribution by Position",
+           xlab = "Position", 
+           ylab = "Cluster",
+           las = 2) # Rotate x-axis labels
+```
+
+
+### Discussion:
+From the cluster distributions we can see that cluster 1 dominates across left and right foot, while cluster 2 has few players in each category, suggesting weak differentiation by foot. However, when it comes to the positions, cluster 1 contains almost all of the attakers. And although having way less overall players than cluster 1, cluster 2 contains more defenders. Cluster 2 has an obviously higher ratio of defenders. This agrees with what we saw in the clustering, with cluster 1 having stronger attacking behaviours like dribbles.
+
+# Part 2: Regression analysis
+
+## Question 1
+```{r}
+# Check marketvalue normality
+hist(football_mydata$market_value, main = "Histogram of Market Value",
+     col = "darkolivegreen2", xlab = "Market Value", freq = FALSE)
+abline(v = mean(football_mydata$market_value), col = "cornflowerblue", lwd = 2, lty = 2)
+abline(v = median(football_mydata$market_value), col = "darkorange", lwd = 2, lty = 2)
+legend("topright", legend = c("Mean", "Median"), col = c("cornflowerblue", "darkorange"),
+       lwd = 2, lty = 2)
+
+qqnorm(football_mydata$market_value, main="Q-Q Plot of Market Value", col="darkolivegreen4")
+qqline(football_mydata$market_value, col = "red")
+
+skewness(football_mydata_clean$market_value)
+
+# Apply log transformation
+football_mydata$log_market_value <- log(football_mydata_clean$market_value + 0.01)
+
+hist(football_mydata$log_market_value, main = "Histogram of log(Market Value)",
+     col = "darkolivegreen2", xlab = "log(Market Value)", freq = FALSE)
+abline(v = mean(football_mydata$log_market_value), col = "cornflowerblue", lwd = 2, lty = 2)
+abline(v = median(football_mydata$log_market_value), col = "darkorange", lwd = 2, lty = 2)
+legend("topleft", legend = c("Mean", "Median"), col = c("cornflowerblue", "darkorange"),
+       lwd = 2, lty = 2)
+
+qqnorm(football_mydata$log_market_value, main="Q-Q Plot of log(Market Value)", col="darkolivegreen4")
+qqline(football_mydata$log_market_value, col = "red")
+
+skewness(football_mydata$log_market_value)
+
+par(mfrow = c(1, 2))
+hist(football_mydata$market_value, main = "Histogram of Market Value",
+     col = "lightblue", xlab = "Market Value", freq = FALSE)
+abline(v = mean(football_mydata$market_value), col = "cornflowerblue", lwd = 2, lty = 2)
+abline(v = median(football_mydata$market_value), col = "darkorange", lwd = 2, lty = 2)
+legend("topright", legend = c("Mean", "Median"), col = c("cornflowerblue", "darkorange"),
+       lwd = 2, lty = 2)
+hist(football_mydata$log_market_value, main = "Histogram of log(Market Value)",
+     col = "darkolivegreen2", xlab = "log(Market Value)", freq = FALSE)
+abline(v = mean(football_mydata$log_market_value), col = "cornflowerblue", lwd = 2, lty = 2)
+abline(v = median(football_mydata$log_market_value), col = "darkorange", lwd = 2, lty = 2)
+legend("topleft", legend = c("Mean", "Median"), col = c("cornflowerblue", "darkorange"),
+       lwd = 2, lty = 2)
+par(mfrow = c(1, 1))
+
+
+
+
+class(football_mydata)
+model_raw <- lm(market_value ~ ., data = football_mydata)
+model_log <- lm(log_market_value ~ ., data = football_mydata)
+
+par(mfrow = c(2, 2))  
+
+plot(model_raw, which = 1, main = "Residuals vs Fitted (Raw)")
+plot(model_raw, which = 2, main = "Q-Q Plot (Raw)")
+
+plot(model_log, which = 1, main = "Residuals vs Fitted (Log-Transformed)")
+plot(model_log, which = 2, main = "Q-Q Plot (Log-Transformed)")
+
+shapiro.test(resid(model_log))
+
+```
+### Discussion:
+From the Residuals vs Fitted (Raw) we can see that residuals increase in spread as fitted values increase from next to right, which indicates heteroscedasticity. And some outliers can be seen. From Q-Q Plot (Raw) we can see significant deviations from the diagonal line, especially in the tails. This violates the normality of residuals assumption of regression assumptions. 
+Residuals vs Fitted (Log-Transformed) shows that after transformation, the spread of residuals appears more consistent across fitted values, mitigating the pattern of increasing variance. But still some outliers can be sseen. The Q-Q plot for the log-transformed data shows a much closer alignment to the diagonal line, especially in the middle range. The tails still show some deviation, but it’s far less pronounced than in the raw data, indicating the residuals are closer to normality now.
+The transformation of market value better satisfies the assumptions of linear regression, so it is performed and used in the rest of the questions. 
+
+## Question 2
+
+```{r}
+# Apply LTS regression for robust outlier detection
+lts_model <- ltsReg(log_market_value ~ . - market_value, 
+                   data = football_mydata, 
+                   alpha = 0.75)
+
+# Get standardized residuals and flag outliers (99% cutoff)
+cutoff <- qnorm(0.995)
+std_resid <- resid(lts_model)/lts_model$scale
+outliers_lts <- which(abs(std_resid) > cutoff)
+
+# Combine both detection methods
+all_outliers <- unique(c(outliers_lts))
+
+# Remove outliers if any found
+if(length(all_outliers) > 0) {
+  message(paste("Removing", length(all_outliers), "outliers:", 
+               paste(rownames(football_mydata)[all_outliers], collapse=", ")))
+  football_clean <- football_mydata[-all_outliers, ]
+} else {
+  football_clean <- football_mydata
+  message("No outliers detected")
+}
+
+# Create regression outlier map 
+plot(lts_model$RD, std_resid, pch=19,
+     xlab="Robust distance (MCD)",
+     ylab="Standardized LTS residuals",
+     main="Regression Outlier Map")
+abline(h=0, col="grey", lty=2)
+abline(h=c(-cutoff, cutoff), col="red")
+p <- length(coef(lts_model)) - 1
+abline(v=sqrt(qchisq(0.99, p)), col="red")
+
+# Refit model with clean data
+final_model <- lm(log_market_value ~ . - market_value, data = football_clean)
+
+# Check model assumptions
+par(mfrow=c(2,2))
+plot(final_model)
+shapiro.test(resid(final_model))  # Normality test
+
+residuals <- resid(final_model)
+
+# Index plot
+plot(residuals, type = "o", main = "Index Plot of Residuals",
+     ylab = "Residuals", xlab = "Index")
+abline(h = 0, col = "red", lty = 2)
+
+# Show final model summary
+summary(final_model)
+```
+
+
+### Discussion:
+Acccording to regression outlier map displaying the standardized LTS residuals versus the robust distance, most observations fall in line within the thresholds, but a few points have high MCD values (>10) or large residuals not following the linear model. 9 observations are removed at last. The refitted model with clean data mostly satisfies the model assumptions, having less outliers in the QQ plot. 
+
+
+## Question 3
+
+```{r}
+# Stepwise regression (AIC-based)
+final_model <- step(final_model, direction = "both")
+
+# Get VIF values
+vif_values <- car::vif(final_model)
+
+# Identify variables with VIF > 5
+high_vif_vars <- names(which(vif_values > 5))
+
+# Remove high VIF variables one at a time
+if (length(high_vif_vars) > 0) {
+  final_model <- update(final_model, 
+                       paste(". ~ . -", high_vif_vars[1]))  # Remove the first high-VIF variable
+  # Re-check VIF and repeat if needed
+}
+# Show final VIF values
+cat("\nFinal VIF values:\n")
+print(car::vif(final_model))
+
+# Get design matrix 
+X <- model.matrix(final_model)[,-1]
+print(head(X))
+
+# Compute eigenvalues of the correlation matrix
+eigen_results <- eigen(cor(X))
+eigenvalues <- eigen_results$values
+condition_indices <- sqrt(max(eigenvalues)/eigenvalues)
+
+CI_table <- data.frame(
+  Index = seq_along(eigenvalues),
+  Eigenvalue = round(eigenvalues, 4),
+  Condition_Index = round(condition_indices, 4)
+)
+
+print(CI_table)
+
+```
+
+### Discussion:
+A stepwise method based on AIC is applied. Minutes_played, age, dribbles_per_90, height, passes_per_90, shots_per_90 and weight are determined to be the significant variables. Since all VIFs are below 5 and the largest Condition indice being 3.27<10, the final model doesn't suffer from multicollinearity. 
+
+## Question 4
+
+```{r}
+# Get standardized residuals 
+final_model_res <- MASS::stdres(final_model)
+
+# Set cutoff for outliers (99% confidence)
+cutoff <- qnorm(0.995)
+
+### Index Plot of Standardized Residuals
+plot(final_model_res, pch = 19,
+     xlab = "Observation Index", 
+     ylab = "Standardized Residual",
+     main = "Index Plot of Standardized Residuals",
+     ylim = c(min(final_model_res, -cutoff), 
+              max(final_model_res, cutoff)))
+
+abline(h = 0, col = "grey", lwd = 1.5, lty = 2)
+abline(h = -cutoff, col = "red", lwd = 1.5)
+abline(h = cutoff, col = "red", lwd = 1.5)
+
+# Label any points beyond the cutoff
+outliers <- which(abs(final_model_res) > cutoff)
+if(length(outliers) > 0) {
+  text(outliers, final_model_res[outliers], 
+       labels = outliers, pos = 4, cex = 0.8, col = "red")
+}
+
+### Residuals vs Fitted Values Plot
+plot(fitted(final_model), final_model_res, pch = 19,
+     xlab = "Fitted Values", 
+     ylab = "Standardized Residual",
+     main = "Residuals vs Fitted Values",
+     ylim = c(min(final_model_res, -cutoff), 
+              max(final_model_res, cutoff)))
+
+abline(h = 0, col = "grey", lwd = 1.5, lty = 2)
+abline(h = -cutoff, col = "red", lwd = 1.5)
+abline(h = cutoff, col = "red", lwd = 1.5)
+
+# Label outliers in this view
+if(length(outliers) > 0) {
+  text(fitted(final_model)[outliers], final_model_res[outliers], 
+       labels = outliers, pos = 4, cex = 0.8, col = "red")
+}
+
+### Add a Q-Q Plot for Normality Check
+qqnorm(final_model_res, pch = 19, main = "Q-Q Plot of Residuals")
+qqline(final_model_res, col = "red", lwd = 2)
+
+predictors <- c("minutes_played", "age", "dribbles_per_90", "height",
+                "passes_per_90", "shots_per_90", "weight")
+
+# Set up multi-panel plot (3x3 grid)
+par(mfrow = c(3, 3), mar = c(4, 4, 2, 1))  # Adjust margins
+
+for(pred in predictors) {
+  # Get predictor values from the original data
+  x_vals <- model.frame(final_model)[[pred]]
+  
+  plot(x_vals, final_model_res, pch = 19,
+       col = ifelse(abs(final_model_res) > cutoff, "red", "black"),
+       xlab = pred, ylab = "Standardized Residual",
+       main = paste("vs", pred),
+       ylim = range(c(-cutoff, cutoff, final_model_res)))
+  
+  abline(h = 0, col = "grey", lwd = 1.5, lty = 2)
+  abline(h = c(-cutoff, cutoff), col = "red", lwd = 1.5)
+  
+  # Add smoothed trend line (blue)
+  lines(lowess(x_vals, final_model_res), col = "blue", lwd = 2)
+  
+  # Label outliers
+  if(length(outliers) > 0) {
+    text(x_vals[outliers], final_model_res[outliers],
+         labels = outliers, pos = 4, cex = 0.7, col = "red")
+  }
+}
+# Reset graphical parameters
+par(mfrow = c(1, 1))
+
+# Shapiro-Wilk test (formal test)
+shapiro.test(resid(final_model))
+
+```
+### Discussion:
+Independence: The index plot of standardized residuals shows random scatter without patterns, supporting independent errors.
+
+Homoscedasticity: The residuals vs. fitted plot displays a consistent spread across fitted values, indicating constant variance, with only minor outlier(68, 108 and 31) influence.
+
+Linearity: Residuals vs. each predictor reveal no systematic patterns, suggesting the model captures linear relationships appropriately, so no additional terms need to be added in the linear model.
+
+Normality: The Q-Q plot and Shapiro-Wilk test (W = 0.99784, p = 0.9757) confirm that residuals are approximately normally distributed.
+
+All the assumptions are satisfied.
+
+
+
+
+
+
+
+
+
+
+
+
